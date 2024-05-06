@@ -108,7 +108,7 @@ stages:
                     deployToSlotOrASE: true
                     ResourceGroupName: $(resourceGroup)
                     SlotName: "staging"
-                    packageForLinux: "$(Agent.BuildDirectory)/app/Web.zip"
+                    packageForLinux: "$(Agent.BuildDirectory)/app/*.zip"
 
   - stage: deployToProd
     condition: and(succeeded(), eq(variables.isMain, 'true'))
