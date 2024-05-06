@@ -108,7 +108,7 @@ stages:
                     WebAppName: $(webAppName)
                     deployToSlotOrASE: true
                     ResourceGroupName: $(resourceGroup)
-                    SlotName: "test"
+                    SlotName: "staging"
                     packageForLinux: "$(Agent.BuildDirectory)/app/web.zip"
 
   - stage: deployToProd
