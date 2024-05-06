@@ -55,10 +55,9 @@ stages:
           projects: $(BuildParameters.TestProjects)
           arguments: '--configuration $(buildConfiguration) /p:CollectCoverage=true /p:CoverletOutputFormat=cobertura'
 
-      - task: PublishCodeCoverageResults@1
+      - task: PublishCodeCoverageResults@2
         displayName: "Publish code coverage results"
         inputs:
-          codeCoverageTool: "Cobertura"
           summaryFileLocation: '$(Agent.BuildDirectory)/**/coverage.cobertura.xml'
 
     - job: Publish
@@ -109,7 +108,7 @@ stages:
                     deployToSlotOrASE: true
                     ResourceGroupName: $(resourceGroup)
                     SlotName: "staging"
-                    packageForLinux: "$(Agent.BuildDirectory)/app/web.zip"
+                    packageForLinux: "$(Agent.BuildDirectory)/app/Web.zip"
 
   - stage: deployToProd
     condition: and(succeeded(), eq(variables.isMain, 'true'))
