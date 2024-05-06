@@ -89,7 +89,7 @@ stages:
   - stage: deployTostaging
     jobs:
       - deployment: DeployToStaging
-        displayName: Deploy To TStaging
+        displayName: Deploy To Staging
         environment: BBStagingEnvironment
         strategy:
           runOnce:
@@ -113,7 +113,7 @@ stages:
 
   - stage: deployToProd
     condition: and(succeeded(), eq(variables.isMain, 'true'))
-    dependsOn: deployToTest
+    dependsOn: DeployToStaging
     jobs:
       - deployment: webDeployToProd
         displayName: Deploy To Prod
@@ -135,7 +135,7 @@ stages:
 
               - task: AzureAppServiceManage@0
                 inputs:
-                  azureSubscription: '$(subscription)'
+                  azureSubscription: '$(serviceConnection)'
                   Action: 'Swap Slots'
                   WebAppName: '$(webAppName)'
                   ResourceGroupName: '''$(webAppName)'''
