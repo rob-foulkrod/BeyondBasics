@@ -25,6 +25,9 @@ variables:
 - name: webAppName
   value: 'beyondBasics'
 
+-  name: isMain
+   value: $[eq(variables['Build.SourceBranch'], 'refs/heads/main')]  # Set to true only for the main branch
+
 stages:
   - stage: build
     jobs:
