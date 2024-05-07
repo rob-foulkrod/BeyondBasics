@@ -25,6 +25,12 @@ variables:
 - name: webAppName
   value: 'beyondBasics'
 
+- name: validationSlotName
+  value: 'staging'
+
+- name: stagingSlotName
+  value: 'staging'
+
 -  name: isMain
    value: $[eq(variables['Build.SourceBranch'], 'refs/heads/main')]  # Set to true only for the main branch
 
@@ -42,20 +48,22 @@ stages:
       - task: DotNetCoreCLI@2
         displayName: Restore
         inputs:
-          command: restore
-          projects: $(BuildParameters.RestoreBuildProjects)
+          command: 'restore'
+          projects: '$(BuildParameters.RestoreBuildProjects)'
+          feedsToUse: 'select'
 
       - task: DotNetCoreCLI@2
         displayName: Build
         inputs:
-          projects: $(BuildParameters.RestoreBuildProjects)
-          arguments: --configuration $(BuildConfiguration)
+          command: 'build'
+          projects: '$(BuildParameters.RestoreBuildProjects)'
+          arguments: '--configuration $(BuildConfiguration)'
 
       - task: DotNetCoreCLI@2
         displayName: "Running Tests"
         inputs:
           command: 'test'
-          projects: $(BuildParameters.TestProjects)
+          projects: '$(BuildParameters.TestProjects)'
           arguments: '--configuration $(buildConfiguration) /p:CollectCoverage=true /p:CoverletOutputFormat=cobertura'
 
       - task: PublishCodeCoverageResults@2
@@ -67,7 +75,7 @@ stages:
       displayName: Publish
       dependsOn: CI
       pool:
-        vmImage: ubuntu-latest
+        vmImage: windows-latest
       steps:
       - checkout: self
         fetchDepth: 1
@@ -75,23 +83,22 @@ stages:
       - task: DotNetCoreCLI@2
         displayName: Publish
         inputs:
-          command: publish
-          publishWebProjects: True
-          projects: $(BuildParameters.RestoreBuildProjects)
-          arguments: --configuration $(BuildConfiguration) --output $(build.artifactstagingdirectory)
-          zipAfterPublish: True
+          command: 'publish'
+          publishWebProjects: true
+          arguments: '--configuration $(BuildConfiguration) --output $(build.artifactstagingdirectory)'
 
-      - task: PublishBuildArtifacts@1
+      - task: PublishPipelineArtifact@1
         displayName: Publish Artifact
         condition: succeededOrFailed()
         inputs:
-          PathtoPublish: $(build.artifactstagingdirectory)
-          ArtifactName: "app"
+          targetPath: '$(build.artifactstagingdirectory)'
+          artifact: 'app'
+          publishLocation: 'pipeline'
 
-  - stage: deployTostaging
+  - stage: deployToValidation
     jobs:
       - deployment: DeployToStaging
-        displayName: Deploy To Staging
+        displayName: Deploy To $(validationSlotName)
         environment: BBStagingEnvironment
         strategy:
           runOnce:
@@ -104,18 +111,18 @@ stages:
                 - task: AzureRmWebAppDeployment@4
                   displayName: Deploy App To Test
                   inputs:
-                    ConnectionType: "AzureRM"
-                    azureSubscription: $(serviceConnection)
-                    appType: "webAppLinux"
-                    WebAppName: $(webAppName)
+                    ConnectionType: 'AzureRM'
+                    azureSubscription: '$(serviceConnection)'
+                    appType: 'webAppLinux'
+                    WebAppName: '$(webAppName)'
                     deployToSlotOrASE: true
-                    ResourceGroupName: $(resourceGroup)
-                    SlotName: "staging"
-                    packageForLinux: "$(Agent.BuildDirectory)/app/*.zip"
+                    ResourceGroupName: '$(resourceGroup)'
+                    SlotName: '$(validationSlotName)'
+                    packageForLinux: '$(Agent.BuildDirectory)/app/*.zip'
 
   - stage: deployToProd
     condition: and(succeeded(), eq(variables.isMain, 'true'))
-    dependsOn: DeployToStaging
+    dependsOn: deployToValidation
     jobs:
       - deployment: webDeployToProd
         displayName: Deploy To Prod
@@ -132,13 +139,13 @@ stages:
                   WebAppName: '$(webAppName)'
                   deployToSlotOrASE: true
                   ResourceGroupName: '$(resourceGroup)'
-                  SlotName: 'staging'
-                  packageForLinux: '$(Agent.BuildDirectory)/app/web.zip'
+                  SlotName: '$(stagingSlotName)'
+                  packageForLinux: '$(Agent.BuildDirectory)/app/*.zip'
 
               - task: AzureAppServiceManage@0
                 inputs:
                   azureSubscription: '$(serviceConnection)'
                   Action: 'Swap Slots'
                   WebAppName: '$(webAppName)'
-                  ResourceGroupName: '''$(webAppName)'''
-                  SourceSlot: 'staging'
+                  ResourceGroupName: '$(resourceGroup)'
+                  SourceSlot: '$(stagingSlotName)'
