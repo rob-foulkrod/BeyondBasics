@@ -19,6 +19,13 @@ variables:
 - name: serviceConnection
   value: 'MTTManaged(48640fa2-e257-4a45-a974-878a933075d5)'
 
+- name: validationEnvironmentName
+  value: 'BeyondBasics-RG'
+
+- name: productionEnvironmentName
+  value: 'BeyondBasics-RG'
+
+
 - name: resourceGroup
   value: 'BeyondBasics-RG'
 
@@ -81,14 +88,14 @@ stages:
         fetchDepth: 1
 
       - task: DotNetCoreCLI@2
-        displayName: Publish
+        displayName: Production Complilation
         inputs:
           command: 'publish'
           publishWebProjects: true
           arguments: '--configuration $(BuildConfiguration) --output $(build.artifactstagingdirectory)'
 
       - task: PublishPipelineArtifact@1
-        displayName: Publish Artifact
+        displayName: Upload Artifact
         condition: succeededOrFailed()
         inputs:
           targetPath: '$(build.artifactstagingdirectory)'
@@ -99,7 +106,7 @@ stages:
     jobs:
       - deployment: DeployToStaging
         displayName: 'Deploy To ${{ variables.validationSlotName }} slot'
-        environment: BBStagingEnvironment
+        environment: $(validationEnvironmentName)
         strategy:
           runOnce:
             deploy:
@@ -126,7 +133,7 @@ stages:
     jobs:
       - deployment: webDeployToProd
         displayName: Deploy To Prod
-        environment: BBProductionEnvironment
+        environment: $(productionEnvironmentName)
         strategy:
           runOnce:
             deploy:
