@@ -20,11 +20,10 @@ variables:
   value: 'MTTManaged(48640fa2-e257-4a45-a974-878a933075d5)'
 
 - name: validationEnvironmentName
-  value: 'BeyondBasics-RG'
+  value: 'BBValidationEnvironment'
 
 - name: productionEnvironmentName
-  value: 'BeyondBasics-RG'
-
+  value: 'BBProductionEnvironment'
 
 - name: resourceGroup
   value: 'BeyondBasics-RG'
