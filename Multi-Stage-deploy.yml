@@ -98,7 +98,7 @@ stages:
   - stage: deployToValidation
     jobs:
       - deployment: DeployToStaging
-        displayName: Deploy To $(validationSlotName)
+        displayName: 'Deploy To ${{ variables.validationSlotName }} slot'
         environment: BBStagingEnvironment
         strategy:
           runOnce:
