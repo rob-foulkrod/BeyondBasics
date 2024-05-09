@@ -1,0 +1,13 @@
+get http://localhost:7071/api/HttpHello
+
+###
+
+get http://localhost:7071/api/HttpHello?name=Azure
+
+###
+
+post http://localhost:7071/api/HttpHello
+
+{
+    "name": "Azure"
+}

@@ -1,0 +1,13 @@
+# Obtain a token from the managed identity 
+# @name tokenrequest
+GET http://169.254.169.254/metadata/identity/oauth2/token
+   ?api-version=2018-02-01
+   &resource=https://beyondbasics.blob.core.windows.net
+metadata: true
+
+###
+@token = {{tokenrequest.response.body.access_token}}
+
+GET https://beyondbasics.blob.core.windows.net/images/koala.jpg
+Authorization: bearer {{token}}
+x-ms-version: 2017-11-09
