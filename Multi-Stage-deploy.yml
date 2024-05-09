@@ -1,0 +1,157 @@
+name: yaml-$(date:yyyyMMdd)$(rev:.r)
+
+trigger:
+  branches:
+    include:
+    - refs/heads/main
+    - refs/heads/dev
+
+variables:
+- name: BuildParameters.RestoreBuildProjects
+  value: '**/*.csproj'
+
+- name: BuildParameters.TestProjects
+  value: '**/*[Tt]ests/*.csproj'
+
+- name: BuildConfiguration
+  value: 'Release'
+
+- name: serviceConnection
+  value: 'MTTManaged(48640fa2-e257-4a45-a974-878a933075d5)'
+
+- name: validationEnvironmentName
+  value: 'BBValidationEnvironment'
+
+- name: productionEnvironmentName
+  value: 'BBProductionEnvironment'
+
+- name: resourceGroup
+  value: 'BeyondBasics-RG'
+
+- name: webAppName
+  value: 'beyondBasics'
+
+- name: validationSlotName
+  value: 'staging'
+
+- name: stagingSlotName
+  value: 'staging'
+
+-  name: isMain
+   value: $[eq(variables['Build.SourceBranch'], 'refs/heads/main')]  # Set to true only for the main branch
+
+stages:
+  - stage: build
+    jobs:
+    - job: CI
+      displayName: CI
+      pool:
+        vmImage: windows-latest
+      steps:
+      - checkout: self
+        fetchDepth: 1
+
+      - task: DotNetCoreCLI@2
+        displayName: Restore
+        inputs:
+          command: 'restore'
+          projects: '$(BuildParameters.RestoreBuildProjects)'
+          feedsToUse: 'select'
+
+      - task: DotNetCoreCLI@2
+        displayName: Build
+        inputs:
+          command: 'build'
+          projects: '$(BuildParameters.RestoreBuildProjects)'
+          arguments: '--configuration $(BuildConfiguration)'
+
+      - task: DotNetCoreCLI@2
+        displayName: "Running Tests"
+        inputs:
+          command: 'test'
+          projects: '$(BuildParameters.TestProjects)'
+          arguments: '--configuration $(buildConfiguration) /p:CollectCoverage=true /p:CoverletOutputFormat=cobertura'
+
+      - task: PublishCodeCoverageResults@2
+        displayName: "Publish code coverage results"
+        inputs:
+          summaryFileLocation: '$(Agent.BuildDirectory)/**/coverage.cobertura.xml'
+
+    - job: Publish
+      displayName: Publish
+      dependsOn: CI
+      pool:
+        vmImage: windows-latest
+      steps:
+      - checkout: self
+        fetchDepth: 1
+
+      - task: DotNetCoreCLI@2
+        displayName: Production Complilation
+        inputs:
+          command: 'publish'
+          publishWebProjects: true
+          arguments: '--configuration $(BuildConfiguration) --output $(build.artifactstagingdirectory)'
+
+      - task: PublishPipelineArtifact@1
+        displayName: Upload Artifact
+        condition: succeededOrFailed()
+        inputs:
+          targetPath: '$(build.artifactstagingdirectory)'
+          artifact: 'app'
+          publishLocation: 'pipeline'
+
+  - stage: deployToValidation
+    jobs:
+      - deployment: DeployToStaging
+        displayName: 'Deploy To ${{ variables.validationSlotName }} slot'
+        environment: $(validationEnvironmentName)
+        strategy:
+          runOnce:
+            deploy:
+              steps:
+                - bash: tree
+                  displayName: Where Am I
+                  workingDirectory: $(Agent.BuildDirectory)
+
+                - task: AzureRmWebAppDeployment@4
+                  displayName: Deploy App To Test
+                  inputs:
+                    ConnectionType: 'AzureRM'
+                    azureSubscription: '$(serviceConnection)'
+                    appType: 'webAppLinux'
+                    WebAppName: '$(webAppName)'
+                    deployToSlotOrASE: true
+                    ResourceGroupName: '$(resourceGroup)'
+                    SlotName: '$(validationSlotName)'
+                    packageForLinux: '$(Agent.BuildDirectory)/app/*.zip'
+
+  - stage: deployToProd
+    condition: and(succeeded(), eq(variables.isMain, 'true'))
+    dependsOn: deployToValidation
+    jobs:
+      - deployment: webDeployToProd
+        displayName: Deploy To Prod
+        environment: $(productionEnvironmentName)
+        strategy:
+          runOnce:
+            deploy:
+              steps:
+              - task: AzureRmWebAppDeployment@4
+                inputs:
+                  ConnectionType: 'AzureRM'
+                  azureSubscription: '$(serviceConnection)'
+                  appType: 'webApp'
+                  WebAppName: '$(webAppName)'
+                  deployToSlotOrASE: true
+                  ResourceGroupName: '$(resourceGroup)'
+                  SlotName: '$(stagingSlotName)'
+                  packageForLinux: '$(Agent.BuildDirectory)/app/*.zip'
+
+              - task: AzureAppServiceManage@0
+                inputs:
+                  azureSubscription: '$(serviceConnection)'
+                  Action: 'Swap Slots'
+                  WebAppName: '$(webAppName)'
+                  ResourceGroupName: '$(resourceGroup)'
+                  SourceSlot: '$(stagingSlotName)'
